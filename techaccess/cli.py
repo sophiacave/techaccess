@@ -272,7 +272,7 @@ def contrast(url: str, output: str | None, failures_only: bool):
 @click.argument("url")
 @click.option("--max-pages", "-n", default=20, help="Maximum pages to scan (default: 20)")
 @click.option("--viewports", "-v", default=None, help="Comma-separated viewports (default: desktop only for speed)")
-@click.option("--format", "-f", "fmt", type=click.Choice(["json", "markdown"]), default="markdown")
+@click.option("--format", "-f", "fmt", type=click.Choice(["json", "markdown", "html"]), default="markdown")
 @click.option("--output", "-o", default=None, help="Output file path")
 @click.option("--fail-on", type=click.Choice(["critical", "serious", "moderate", "minor"]), default=None,
               help="Exit with code 1 if issues at this level or above exist (CI mode)")
@@ -288,6 +288,9 @@ def crawl(url: str, max_pages: int, viewports: str | None, fmt: str, output: str
 
     if fmt == "json":
         content = json.dumps(result.to_dict(), indent=2)
+    elif fmt == "html":
+        from .report import to_html_crawl
+        content = to_html_crawl(result)
     else:
         from .score import calculate
         lines = [

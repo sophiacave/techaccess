@@ -218,6 +218,123 @@ def to_html(result: ScanResult, score: Score) -> str:
 </html>"""
 
 
+def to_html_crawl(crawl_result) -> str:
+    """Generate HTML dashboard for multi-page crawl results."""
+    from .score import calculate
+
+    grade_colors = {
+        "A+": "#22c55e", "A": "#22c55e", "A-": "#22c55e",
+        "B+": "#eab308", "B": "#eab308", "B-": "#eab308",
+        "C+": "#f97316", "C": "#f97316", "C-": "#f97316",
+        "D+": "#ef4444", "D": "#ef4444", "D-": "#ef4444",
+        "F": "#7f1d1d",
+    }
+
+    avg = crawl_result.avg_score
+    if avg >= 90: avg_grade = "A"
+    elif avg >= 80: avg_grade = "B"
+    elif avg >= 70: avg_grade = "C"
+    elif avg >= 60: avg_grade = "D"
+    else: avg_grade = "F"
+    avg_color = grade_colors.get(avg_grade, "#888")
+
+    pages_html = ""
+    for page in crawl_result.pages:
+        s = calculate(page.issues)
+        color = grade_colors.get(s.grade, "#888")
+        short_url = page.url.replace(crawl_result.base_url, "") or "/"
+        issue_count = page.violation_count
+        bar_width = s.value
+
+        issues_detail = ""
+        if issue_count > 0:
+            for issue in page.issues[:5]:
+                impact_color = {"critical": "#ef4444", "serious": "#f97316", "moderate": "#eab308", "minor": "#6b7280"}.get(issue.impact, "#888")
+                issues_detail += f'<span class="tag" style="background:{impact_color}">{issue.rule_id}</span> '
+
+        pages_html += f"""
+      <div class="page-row">
+        <div class="page-info">
+          <div class="page-url">{short_url}</div>
+          <div class="page-issues">{issues_detail if issues_detail else '<span style="color:#22c55e">No issues</span>'}</div>
+        </div>
+        <div class="page-score">
+          <div class="bar-bg"><div class="bar-fill" style="width:{bar_width}%;background:{color}"></div></div>
+          <span class="page-grade" style="color:{color}">{s.grade}</span>
+          <span class="page-value">{s.value}</span>
+        </div>
+      </div>"""
+
+    perfect = sum(1 for p in crawl_result.pages if p.violation_count == 0)
+    with_issues = len(crawl_result.pages) - perfect
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TechAccess Site Report — {crawl_result.base_url}</title>
+<style>
+  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+  body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 2rem; line-height: 1.6; }}
+  .container {{ max-width: 960px; margin: 0 auto; }}
+  h1 {{ font-size: 1.5rem; margin-bottom: 0.25rem; }}
+  .url {{ color: #94a3b8; font-size: 0.9rem; }}
+  .hero {{ display: flex; align-items: center; gap: 2rem; background: #1e293b; border-radius: 12px; padding: 2rem; margin: 1.5rem 0; }}
+  .hero-grade {{ font-size: 4rem; font-weight: 800; color: {avg_color}; min-width: 100px; text-align: center; }}
+  .hero-details {{ flex: 1; }}
+  .hero-score {{ font-size: 2rem; font-weight: 700; }}
+  .hero-meta {{ color: #94a3b8; font-size: 0.85rem; margin-top: 0.5rem; }}
+  .stats {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin: 1.5rem 0; }}
+  .stat {{ background: #1e293b; border-radius: 8px; padding: 1rem; text-align: center; }}
+  .stat-num {{ font-size: 1.5rem; font-weight: 700; }}
+  .stat-label {{ color: #94a3b8; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }}
+  h2 {{ font-size: 1.2rem; margin: 1.5rem 0 0.75rem; }}
+  .page-row {{ background: #1e293b; border-radius: 8px; padding: 1rem 1.25rem; margin: 0.5rem 0; display: flex; align-items: center; gap: 1rem; }}
+  .page-info {{ flex: 1; min-width: 0; }}
+  .page-url {{ font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+  .page-issues {{ margin-top: 0.25rem; }}
+  .page-score {{ display: flex; align-items: center; gap: 0.75rem; min-width: 200px; }}
+  .bar-bg {{ flex: 1; height: 8px; background: #334155; border-radius: 4px; overflow: hidden; }}
+  .bar-fill {{ height: 100%; border-radius: 4px; transition: width 0.3s; }}
+  .page-grade {{ font-weight: 800; font-size: 1.1rem; min-width: 30px; }}
+  .page-value {{ color: #94a3b8; font-size: 0.85rem; min-width: 24px; text-align: right; }}
+  .tag {{ color: #fff; padding: 1px 6px; border-radius: 3px; font-size: 0.7rem; font-weight: 600; }}
+  footer {{ margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #334155; color: #64748b; font-size: 0.8rem; text-align: center; }}
+  footer a {{ color: #60a5fa; text-decoration: none; }}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>TechAccess Site Crawl Report</h1>
+  <p class="url">{crawl_result.base_url}</p>
+
+  <div class="hero">
+    <div class="hero-grade">{avg_grade}</div>
+    <div class="hero-details">
+      <div class="hero-score">{avg:.0f}/100 avg</div>
+      <div class="hero-meta">{len(crawl_result.pages)} pages scanned in {crawl_result.total_scan_time_ms / 1000:.1f}s</div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-num" style="color:#22c55e">{perfect}</div><div class="stat-label">Perfect</div></div>
+    <div class="stat"><div class="stat-num" style="color:#f97316">{with_issues}</div><div class="stat-label">With Issues</div></div>
+    <div class="stat"><div class="stat-num">{crawl_result.total_issues}</div><div class="stat-label">Total Issues</div></div>
+    <div class="stat"><div class="stat-num" style="color:#ef4444">{crawl_result.total_critical}</div><div class="stat-label">Critical</div></div>
+  </div>
+
+  <h2>Pages</h2>
+  {pages_html}
+
+  <footer>
+    Generated by <a href="https://github.com/sophiacave/techaccess">TechAccess</a> | {crawl_result.timestamp[:10]}
+  </footer>
+</div>
+</body>
+</html>"""
+
+
 def to_sarif(result: ScanResult) -> str:
     """Generate SARIF report for GitHub Code Scanning integration."""
     sarif = {
