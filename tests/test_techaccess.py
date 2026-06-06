@@ -97,6 +97,35 @@ class TestScanResult:
         assert d["issues"][0]["rule_id"] == "color-contrast"
 
 
+class TestOverflowClip:
+    def test_clip_issue_structure(self):
+        issue = make_issue(
+            rule_id="overflow-clip",
+            wcag="1.4.10",
+            impact="serious",
+            description="Content clipped by overflow:hidden — div.grid overflows div.lesson-visual by 120px",
+            source="techaccess",
+        )
+        assert issue.rule_id == "overflow-clip"
+        assert issue.source == "techaccess"
+        assert issue.wcag == "1.4.10"
+
+    def test_clip_in_score(self):
+        issues = [make_issue(rule_id="overflow-clip", impact="serious", source="techaccess")]
+        score = calculate(issues)
+        assert score.value == 90  # -10 for serious
+
+    def test_clip_in_report(self):
+        result = make_result([
+            make_issue(rule_id="overflow-clip", impact="serious",
+                       description="Content clipped by overflow:hidden", source="techaccess"),
+        ])
+        score = calculate(result.issues)
+        md = to_markdown(result, score)
+        assert "overflow-clip" in md
+        assert "Serious" in md
+
+
 class TestViewports:
     def test_mobile_exists(self):
         assert "mobile" in VIEWPORTS

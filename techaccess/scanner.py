@@ -95,6 +95,42 @@ class ScanResult:
         }
 
 
+CLIPPING_CHECK_JS = """() => {
+    const vw = window.innerWidth;
+    const issues = [];
+    document.querySelectorAll('*').forEach(el => {
+        const cs = getComputedStyle(el);
+        if (cs.overflowX !== 'hidden') return;
+        const rect = el.getBoundingClientRect();
+        if (rect.width <= 0) return;
+        // Check if any child extends beyond this element
+        for (const child of el.children) {
+            const cr = child.getBoundingClientRect();
+            if (cr.width <= 0) continue;
+            if (cr.right > rect.right + 2 || cr.left < rect.left - 2) {
+                const tag = el.tagName.toLowerCase();
+                const cls = el.className ? '.' + String(el.className).split(' ')[0] : '';
+                const childTag = child.tagName.toLowerCase();
+                const childCls = child.className ? '.' + String(child.className).split(' ')[0] : '';
+                const clippedPx = Math.round(Math.max(0, cr.right - rect.right));
+                if (clippedPx > 10) {
+                    issues.push({
+                        parent: `${tag}${cls}`,
+                        child: `${childTag}${childCls}`,
+                        clipped_px: clippedPx,
+                        parent_width: Math.round(rect.width),
+                        child_width: Math.round(cr.width),
+                        html: el.outerHTML.substring(0, 150),
+                    });
+                }
+                break;
+            }
+        }
+    });
+    return issues.slice(0, 20);
+}"""
+
+
 def _extract_wcag(tags: list[str]) -> str:
     """Extract WCAG criterion from axe-core tags like 'wcag111' -> '1.1.1'."""
     for tag in tags:
@@ -184,7 +220,27 @@ def scan(
                         "inapplicable": len(axe_data.get("inapplicable", [])),
                     }
 
-                # 2. Capture ARIA tree (first viewport only)
+                # 2. Check for overflow:hidden clipping (TechAccess custom check)
+                try:
+                    clipped = page.evaluate(CLIPPING_CHECK_JS)
+                    for clip in clipped:
+                        dedup_key = f"overflow-clip:{clip['parent']}:{vp_name}"
+                        if dedup_key not in seen_issues:
+                            seen_issues.add(dedup_key)
+                            result.issues.append(Issue(
+                                rule_id="overflow-clip",
+                                wcag="1.4.10",
+                                impact="serious",
+                                description=f"Content clipped by overflow:hidden — {clip['child']} overflows {clip['parent']} by {clip['clipped_px']}px",
+                                element_html=clip.get("html", ""),
+                                selector=clip["parent"],
+                                viewport=vp_name,
+                                source="techaccess",
+                            ))
+                except Exception:
+                    pass
+
+                # 3. Capture ARIA tree (first viewport only)
                 if include_aria and not result.aria_tree:
                     try:
                         yaml_snap = page.locator(":root").aria_snapshot()
