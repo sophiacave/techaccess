@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "techaccess"
+version = "0.1.0"
+description = "AI-powered accessibility toolkit — WCAG audits, alt text generation, contrast analysis"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "Sophie Cave", email = "hello@likeone.ai" }]
+keywords = ["accessibility", "wcag", "a11y", "ai", "mcp", "audit"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Internet :: WWW/HTTP",
+]
+dependencies = [
+    "playwright>=1.40",
+    "mcp[cli]>=1.0",
+    "httpx>=0.25",
+    "Pillow>=10.0",
+]
+
+[project.optional-dependencies]
+ai = ["ollama>=0.3"]
+
+[project.scripts]
+techaccess = "techaccess.cli:main"
+
+[project.entry-points."mcp.servers"]
+techaccess = "techaccess.server:mcp"
