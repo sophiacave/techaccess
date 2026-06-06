@@ -95,6 +95,42 @@ class ScanResult:
         }
 
 
+PRE_TABLE_CHECK_JS = """() => {
+    const issues = [];
+    const tableChars = /[─━═│┌┐└┘├┤┬┴┼╔╗╚╝╠╣╦╩╬]/;
+    const columnPattern = /\\S+\\s{2,}\\S+\\s{2,}\\S+/;
+
+    document.querySelectorAll('pre').forEach(el => {
+        const text = el.textContent || '';
+        const lines = text.split('\\n').filter(l => l.trim());
+        if (lines.length < 3) return;
+
+        const hasBoxChars = tableChars.test(text);
+        const alignedCols = lines.filter(l => columnPattern.test(l)).length;
+        const isTabular = hasBoxChars || alignedCols >= 3;
+
+        if (!isTabular) return;
+
+        const rect = el.getBoundingClientRect();
+        const vw = window.innerWidth;
+        const overflows = el.scrollWidth > el.clientWidth + 2;
+        const wrapsPooly = getComputedStyle(el).whiteSpace === 'pre-wrap'
+            && lines.some(l => l.length > 40);
+
+        issues.push({
+            type: hasBoxChars ? 'box-drawing' : 'column-aligned',
+            lines: lines.length,
+            overflows: overflows,
+            wraps_poorly: wrapsPooly,
+            width: Math.round(rect.width),
+            scroll_width: el.scrollWidth,
+            preview: lines.slice(0, 3).join(' | ').substring(0, 120),
+            selector: el.className ? 'pre.' + el.className.split(' ')[0] : 'pre',
+        });
+    });
+    return issues.slice(0, 10);
+}"""
+
 CLIPPING_CHECK_JS = """() => {
     const vw = window.innerWidth;
     const issues = [];
@@ -240,7 +276,33 @@ def scan(
                 except Exception:
                     pass
 
-                # 3. Capture ARIA tree (first viewport only)
+                # 3. Check for ASCII tables in <pre> blocks
+                try:
+                    pre_tables = page.evaluate(PRE_TABLE_CHECK_JS)
+                    for pt in pre_tables:
+                        dedup_key = f"pre-table:{pt['selector']}:{pt['preview'][:40]}"
+                        if dedup_key not in seen_issues:
+                            seen_issues.add(dedup_key)
+                            detail = f"ASCII table in <pre> block ({pt['type']}, {pt['lines']} lines)"
+                            if pt.get("overflows"):
+                                detail += " — overflows viewport"
+                            if pt.get("wraps_poorly"):
+                                detail += " — wraps poorly on mobile"
+                            detail += ". Convert to HTML <table> for mobile accessibility."
+                            result.issues.append(Issue(
+                                rule_id="pre-table",
+                                wcag="1.3.1",
+                                impact="moderate",
+                                description=detail,
+                                element_html=pt.get("preview", ""),
+                                selector=pt["selector"],
+                                viewport=vp_name,
+                                source="techaccess",
+                            ))
+                except Exception:
+                    pass
+
+                # 4. Capture ARIA tree (first viewport only)
                 if include_aria and not result.aria_tree:
                     try:
                         yaml_snap = page.locator(":root").aria_snapshot()

@@ -97,6 +97,35 @@ class TestScanResult:
         assert d["issues"][0]["rule_id"] == "color-contrast"
 
 
+class TestPreTable:
+    def test_pre_table_issue(self):
+        issue = make_issue(
+            rule_id="pre-table",
+            wcag="1.3.1",
+            impact="moderate",
+            description="ASCII table in <pre> block (box-drawing, 12 lines) — wraps poorly on mobile. Convert to HTML <table>.",
+            source="techaccess",
+        )
+        assert issue.rule_id == "pre-table"
+        assert issue.wcag == "1.3.1"
+        assert issue.source == "techaccess"
+
+    def test_pre_table_score(self):
+        issues = [make_issue(rule_id="pre-table", impact="moderate", source="techaccess")]
+        score = calculate(issues)
+        assert score.value == 95  # -5 for moderate
+
+    def test_pre_table_in_report(self):
+        result = make_result([
+            make_issue(rule_id="pre-table", impact="moderate",
+                       description="ASCII table in pre block", source="techaccess"),
+        ])
+        score = calculate(result.issues)
+        md = to_markdown(result, score)
+        assert "pre-table" in md
+        assert "Moderate" in md
+
+
 class TestOverflowClip:
     def test_clip_issue_structure(self):
         issue = make_issue(
