@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "techaccess"
-version = "0.2.0"
-description = "AI-powered accessibility toolkit — WCAG audits, alt text generation, contrast analysis"
+version = "0.3.0"
+description = "AI-powered accessibility toolkit — WCAG audits, code fix generation, multi-page crawl, alt text evaluation"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"

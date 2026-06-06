@@ -4,4 +4,4 @@ WCAG audits, AI alt text generation, contrast analysis, and accessibility report
 Built by Like One Foundation. MIT License.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
