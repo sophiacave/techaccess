@@ -1,5 +1,8 @@
 # TechAccess
 
+[![CI](https://github.com/sophiacave/techaccess/actions/workflows/ci.yml/badge.svg)](https://github.com/sophiacave/techaccess/actions/workflows/ci.yml)
+
+
 AI-powered accessibility toolkit. WCAG audits, code fix generation, alt text evaluation, and structured reports — powered by local AI.
 
 Built by [Like One Foundation](https://likeone.ai) — because accessibility shouldn't require a six-figure budget.
