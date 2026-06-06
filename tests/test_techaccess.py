@@ -314,6 +314,73 @@ class TestMarkdownReport:
         assert "TechAccess" in md
 
 
+class TestCrawlResult:
+    def test_empty_crawl(self):
+        from techaccess.crawler import CrawlResult
+        cr = CrawlResult(base_url="https://example.com", timestamp="2026-06-06T12:00:00")
+        assert cr.total_issues == 0
+        assert cr.total_critical == 0
+        assert cr.avg_score == 0.0
+        assert len(cr.pages) == 0
+
+    def test_crawl_with_pages(self):
+        from techaccess.crawler import CrawlResult
+        cr = CrawlResult(
+            base_url="https://example.com",
+            timestamp="2026-06-06T12:00:00",
+            pages=[
+                make_result([], url="https://example.com/"),
+                make_result([make_issue()], url="https://example.com/about"),
+                make_result([], url="https://example.com/contact"),
+            ],
+            total_scan_time_ms=5000,
+        )
+        assert len(cr.pages) == 3
+        assert cr.total_issues == 1
+        assert cr.total_serious == 1
+        assert cr.total_critical == 0
+
+    def test_crawl_avg_score(self):
+        from techaccess.crawler import CrawlResult
+        cr = CrawlResult(
+            base_url="https://example.com",
+            timestamp="2026-06-06T12:00:00",
+            pages=[
+                make_result([], url="https://example.com/"),
+                make_result([], url="https://example.com/about"),
+            ],
+        )
+        assert cr.avg_score == 100.0
+
+    def test_crawl_to_dict(self):
+        from techaccess.crawler import CrawlResult
+        cr = CrawlResult(
+            base_url="https://example.com",
+            timestamp="2026-06-06T12:00:00",
+            pages=[make_result([make_issue(impact="critical")], url="https://example.com/")],
+            total_scan_time_ms=3000,
+        )
+        d = cr.to_dict()
+        assert d["pages_scanned"] == 1
+        assert d["summary"]["critical"] == 1
+        assert d["summary"]["total_issues"] == 1
+        assert d["pages"][0]["url"] == "https://example.com/"
+
+    def test_worst_pages_sorted(self):
+        from techaccess.crawler import CrawlResult
+        cr = CrawlResult(
+            base_url="https://example.com",
+            timestamp="2026-06-06T12:00:00",
+            pages=[
+                make_result([], url="https://example.com/good"),
+                make_result([make_issue(impact="critical"), make_issue(impact="serious", rule_id="img-alt")], url="https://example.com/bad"),
+                make_result([make_issue(impact="minor", rule_id="meta")], url="https://example.com/ok"),
+            ],
+        )
+        worst = cr.worst_pages
+        assert worst[0].url == "https://example.com/bad"
+
+
 class TestSarifReport:
     def test_valid_sarif(self):
         result = make_result([make_issue()])
