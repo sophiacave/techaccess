@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "techaccess"
-version = "0.1.0"
+version = "0.2.0"
 description = "AI-powered accessibility toolkit — WCAG audits, alt text generation, contrast analysis"
 readme = "README.md"
 license = "MIT"
@@ -24,10 +24,12 @@ dependencies = [
     "mcp[cli]>=1.0",
     "httpx>=0.25",
     "Pillow>=10.0",
+    "click>=8.0",
 ]
 
 [project.optional-dependencies]
-ai = ["ollama>=0.3"]
+ai = ["httpx>=0.25"]
+cloud = ["httpx>=0.25"]
 
 [project.scripts]
 techaccess = "techaccess.cli:main"

@@ -109,6 +109,115 @@ def to_markdown(result: ScanResult, score: Score) -> str:
     return "\n".join(lines)
 
 
+def to_html(result: ScanResult, score: Score) -> str:
+    """Generate HTML visual report (dashboard style)."""
+    grade_colors = {
+        "A+": "#22c55e", "A": "#22c55e", "A-": "#22c55e",
+        "B+": "#eab308", "B": "#eab308", "B-": "#eab308",
+        "C+": "#f97316", "C": "#f97316", "C-": "#f97316",
+        "D+": "#ef4444", "D": "#ef4444", "D-": "#ef4444",
+        "F": "#7f1d1d",
+    }
+    color = grade_colors.get(score.grade, "#888")
+
+    issues_html = ""
+    for impact in ["critical", "serious", "moderate", "minor"]:
+        impact_issues = [i for i in result.issues if i.impact == impact]
+        if not impact_issues:
+            continue
+
+        impact_color = {
+            "critical": "#ef4444", "serious": "#f97316",
+            "moderate": "#eab308", "minor": "#6b7280",
+        }[impact]
+
+        seen: dict[str, list] = {}
+        for issue in impact_issues:
+            seen.setdefault(issue.rule_id, []).append(issue)
+
+        for rule_id, instances in seen.items():
+            first = instances[0]
+            wcag = f" (WCAG {first.wcag})" if first.wcag else ""
+            element = first.element_html[:120] if first.element_html else ""
+            element_escaped = element.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            help_link = f' <a href="{first.help_url}" target="_blank">Learn more</a>' if first.help_url else ""
+
+            issues_html += f"""
+      <div class="issue">
+        <div class="issue-header">
+          <span class="impact" style="background:{impact_color}">{impact.upper()}</span>
+          <code>{rule_id}</code>{wcag}{help_link}
+        </div>
+        <p>{first.description}</p>
+        <div class="instances">{len(instances)} instance(s) across {', '.join(set(i.viewport for i in instances))}</div>
+        {"<pre>" + element_escaped + "</pre>" if element_escaped else ""}
+      </div>"""
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TechAccess Report — {result.url}</title>
+<style>
+  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+  body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 2rem; line-height: 1.6; }}
+  .container {{ max-width: 900px; margin: 0 auto; }}
+  h1 {{ font-size: 1.5rem; margin-bottom: 0.5rem; }}
+  .url {{ color: #94a3b8; font-size: 0.9rem; word-break: break-all; }}
+  .score-card {{ display: flex; align-items: center; gap: 2rem; background: #1e293b; border-radius: 12px; padding: 2rem; margin: 1.5rem 0; }}
+  .grade {{ font-size: 4rem; font-weight: 800; color: {color}; min-width: 100px; text-align: center; }}
+  .score-details {{ flex: 1; }}
+  .score-num {{ font-size: 2rem; font-weight: 700; }}
+  .meta {{ color: #94a3b8; font-size: 0.85rem; margin-top: 0.5rem; }}
+  .summary {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin: 1.5rem 0; }}
+  .stat {{ background: #1e293b; border-radius: 8px; padding: 1rem; text-align: center; }}
+  .stat-num {{ font-size: 1.5rem; font-weight: 700; }}
+  .stat-label {{ color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; }}
+  .issue {{ background: #1e293b; border-radius: 8px; padding: 1.25rem; margin: 0.75rem 0; }}
+  .issue-header {{ display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; flex-wrap: wrap; }}
+  .impact {{ color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; }}
+  .issue code {{ background: #334155; padding: 2px 6px; border-radius: 4px; font-size: 0.85rem; }}
+  .issue p {{ color: #cbd5e1; }}
+  .issue pre {{ background: #0f172a; padding: 0.75rem; border-radius: 6px; font-size: 0.8rem; overflow-x: auto; margin-top: 0.5rem; color: #94a3b8; }}
+  .instances {{ color: #64748b; font-size: 0.8rem; margin-top: 0.25rem; }}
+  .issue a {{ color: #60a5fa; text-decoration: none; font-size: 0.85rem; }}
+  .issue a:hover {{ text-decoration: underline; }}
+  footer {{ margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #334155; color: #64748b; font-size: 0.8rem; text-align: center; }}
+  footer a {{ color: #60a5fa; text-decoration: none; }}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>TechAccess Accessibility Report</h1>
+  <p class="url">{result.url}</p>
+
+  <div class="score-card">
+    <div class="grade">{score.grade}</div>
+    <div class="score-details">
+      <div class="score-num">{score.value}/100</div>
+      <div class="meta">Scanned {', '.join(result.viewports_tested)} in {result.scan_time_ms}ms</div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <div class="stat"><div class="stat-num" style="color:#ef4444">{score.critical}</div><div class="stat-label">Critical</div></div>
+    <div class="stat"><div class="stat-num" style="color:#f97316">{score.serious}</div><div class="stat-label">Serious</div></div>
+    <div class="stat"><div class="stat-num" style="color:#eab308">{score.moderate}</div><div class="stat-label">Moderate</div></div>
+    <div class="stat"><div class="stat-num" style="color:#6b7280">{score.minor}</div><div class="stat-label">Minor</div></div>
+  </div>
+
+  <h2 style="margin:1.5rem 0 0.5rem">Issues ({score.total_issues})</h2>
+  {issues_html if issues_html else '<p style="color:#94a3b8">No accessibility issues found. Great work!</p>'}
+
+  <footer>
+    Generated by <a href="https://github.com/sophiacave/techaccess">TechAccess</a> v{result.to_dict().get("version", "0.2.0")} | {result.timestamp[:10]}
+  </footer>
+</div>
+</body>
+</html>"""
+
+
 def to_sarif(result: ScanResult) -> str:
     """Generate SARIF report for GitHub Code Scanning integration."""
     sarif = {
