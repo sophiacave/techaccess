@@ -1,3 +1,4 @@
+<!-- mcp-name: io.github.sophiacave/techaccess -->
 # TechAccess
 
 [![CI](https://github.com/sophiacave/techaccess/actions/workflows/ci.yml/badge.svg)](https://github.com/sophiacave/techaccess/actions/workflows/ci.yml)
